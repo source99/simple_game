@@ -5,7 +5,7 @@
   <title>Green Ball Game</title>
   <style>
     body { margin: 0; background: #eee; }
-    canvas { display: block; margin: 0 auto; background: #fff; }
+    canvas { display: block; margin: 0 auto; background: #fff; touch-action: none; }
   </style>
 </head>
 <body>
@@ -78,6 +78,25 @@
       keys[e.key] = false;
     });
 
+    // Add mobile touch support: on touchstart, set the green ball's velocity to move toward the tap.
+    canvas.addEventListener("touchstart", function(e) {
+      e.preventDefault(); // Prevent default scrolling behavior.
+      let touch = e.touches[0];
+      let rectCanvas = canvas.getBoundingClientRect();
+      let touchX = touch.clientX - rectCanvas.left;
+      let touchY = touch.clientY - rectCanvas.top;
+      // Compute direction from player's center to touch point.
+      let centerX = player.x + player.width / 2;
+      let centerY = player.y + player.height / 2;
+      let dx = touchX - centerX;
+      let dy = touchY - centerY;
+      let len = Math.sqrt(dx * dx + dy * dy);
+      if (len > 0) {
+        player.vx = (dx / len) * initialPlayerSpeed;
+        player.vy = (dy / len) * initialPlayerSpeed;
+      }
+    });
+
     // Helper: Returns a random integer between min and max (inclusive).
     function randomInt(min, max) {
       return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -88,7 +107,7 @@
       return arr[Math.floor(Math.random() * arr.length)];
     }
 
-    // Helper: Create a red obstacle (object) that is at least minDistance from the green ball.
+    // Helper: Create a red obstacle (as an object with properties) that is at least minDistance from the green ball.
     function createRedObstacle() {
       let red;
       while (true) {
@@ -121,7 +140,7 @@
     let animationFrameId;
     let pauseUntil = 0;
 
-    // Instructions.
+    // Instructions to display.
     const instructions = [
       "W: Move Up (vertical)",
       "S: Move Down (vertical)",
@@ -335,14 +354,14 @@
       while (performance.now() - start < ms) { }
     }
 
-    // Game over: update scores and reset.
+    // Game over: update scores and reset the game.
     function gameOver() {
       previousScore = currentScore;
       if (currentScore > highScore) highScore = currentScore;
       resetGame();
     }
 
-    // Reset game for a new round.
+    // Reset game variables for a new round.
     function resetGame() {
       currentScore = 0;
       player.x = randomInt(gameArea.x + objectMargin, gameArea.x + gameArea.width - objectMargin - playerInitialWidth);
