@@ -78,14 +78,14 @@
       keys[e.key] = false;
     });
 
-    // Add mobile touch support: on touchstart, set the green ball's velocity to move toward the tap.
+    // Add mobile touch support: when you tap, the green ball moves toward the tap.
     canvas.addEventListener("touchstart", function(e) {
-      e.preventDefault(); // Prevent default scrolling behavior.
+      e.preventDefault(); // Prevent scrolling.
       let touch = e.touches[0];
       let rectCanvas = canvas.getBoundingClientRect();
       let touchX = touch.clientX - rectCanvas.left;
       let touchY = touch.clientY - rectCanvas.top;
-      // Compute direction from player's center to touch point.
+      // Compute direction from player's center to the touch point.
       let centerX = player.x + player.width / 2;
       let centerY = player.y + player.height / 2;
       let dx = touchX - centerX;
@@ -107,7 +107,7 @@
       return arr[Math.floor(Math.random() * arr.length)];
     }
 
-    // Helper: Create a red obstacle (as an object with properties) that is at least minDistance from the green ball.
+    // Helper: Create a red obstacle (object) that is at least minDistance from the green ball.
     function createRedObstacle() {
       let red;
       while (true) {
@@ -119,9 +119,9 @@
           vx: randomChoice([-2, -1, 1, 2]),
           vy: randomChoice([-2, -1, 1, 2])
         };
-        let dx = (red.x + red.width / 2) - (player.x + player.width / 2);
-        let dy = (red.y + red.height / 2) - (player.y + player.height / 2);
-        let distance = Math.sqrt(dx * dx + dy * dy);
+        let dx = (red.x + red.width/2) - (player.x + player.width/2);
+        let dy = (red.y + red.height/2) - (player.y + player.height/2);
+        let distance = Math.sqrt(dx*dx + dy*dy);
         if (distance >= minDistance) break;
       }
       return red;
@@ -140,19 +140,24 @@
     let animationFrameId;
     let pauseUntil = 0;
 
-    // Instructions to display.
+    // Expanded instructions for mobile and desktop.
     const instructions = [
-      "W: Move Up (vertical)",
-      "S: Move Down (vertical)",
-      "A: Move Left (horizontal)",
-      "D: Move Right (horizontal)",
+      "How to Play:",
+      "1. Navigate the green ball to touch the blue target.",
+      "2. Each blue target gives you 1 point.",
+      "3. Avoid the red balls drifting around; touching one ends the game.",
+      "4. The green ball bounces off the walls, growing and speeding up.",
+      "5. If the green ball's speed reaches 5× its initial speed, the round ends.",
+      "",
+      "Controls:",
+      "W / Arrow Up: Move Up",
+      "S / Arrow Down: Move Down",
+      "A / Arrow Left: Move Left",
+      "D / Arrow Right: Move Right",
       "X: Stop Movement",
-      "B: Make Bigger (hold)",
-      "T: Make Smaller (hold)",
-      "Bounce (edges): Increases size & speed",
-      "Hit blue: +1 point, then relocate targets and pause 0.5 sec",
-      "Red: Lose if touched",
-      "Restart when speed >= 5x initial",
+      "B: Increase size",
+      "T: Decrease size",
+      "Tap the screen (mobile) to move in that direction",
       "Q: Quit"
     ];
 
@@ -174,7 +179,7 @@
 
     // Update game state.
     function update(deltaTime) {
-      // Update player velocity based on key input.
+      // Update player velocity based on keyboard input.
       if (keys["w"] || keys["W"] || keys["ArrowUp"]) {
         player.vx = 0;
         player.vy = -initialPlayerSpeed;
