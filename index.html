@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Green Ball Game</title>
+  <style>
+    body { margin: 0; background: #eee; }
+    canvas { display: block; margin: 0 auto; background: #fff; }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="1024" height="768"></canvas>
+  <script>
+    // Get canvas and context.
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Canvas dimensions.
+    const screenWidth = canvas.width;
+    const screenHeight = canvas.height;
+
+    // Define margins.
+    const topMargin = 50;       // Reserved for scores.
+    const bottomMargin = 100;   // Reserved for instructions.
+    const gameArea = { x: 0, y: topMargin, width: screenWidth, height: screenHeight - topMargin - bottomMargin };
+
+    // Constants.
+    const objectMargin = 20;   // Margin for objects inside the game area.
+    const minDistance = 150;   // Red obstacles must be at least this far from the green ball.
+    const targetSize = 20;
+    const redSize = 20;
+    const playerInitialWidth = 50;
+    const playerInitialHeight = 50;
+    const initialPlayerSpeed = 4;
+    const bounceMultiplier = 1.1;
+    const maxSpeedMultiplier = 5;  // End round if player's speed >= initialPlayerSpeed * 5
+
+    // Game scores.
+    let currentScore = 0;
+    let previousScore = 0;
+    let highScore = 0;
+
+    // Define the player (green ball).
+    let player = {
+      x: randomInt(gameArea.x + objectMargin, gameArea.x + gameArea.width - objectMargin - playerInitialWidth),
+      y: randomInt(gameArea.y + objectMargin, gameArea.y + gameArea.height - objectMargin - playerInitialHeight),
+      width: playerInitialWidth,
+      height: playerInitialHeight,
+      vx: 0,
+      vy: 0
+    };
+
+    // Define the blue target.
+    let target = {
+      x: randomInt(objectMargin, screenWidth - objectMargin - targetSize),
+      y: randomInt(gameArea.y + objectMargin, gameArea.y + gameArea.height - objectMargin - targetSize),
+      width: targetSize,
+      height: targetSize
+    };
+
+    // Define an array for red obstacles.
+    let redObstacles = [];
+    // Initially create 2 red obstacles.
+    for (let i = 0; i < 2; i++) {
+      redObstacles.push(createRedObstacle());
+    }
+
+    // Key state.
+    const keys = {};
+    window.addEventListener("keydown", function(e) {
+      keys[e.key] = true;
+      // Quit the game if Q is pressed.
+      if (e.key.toLowerCase() === "q") {
+        cancelAnimationFrame(animationFrameId);
+      }
+    });
+    window.addEventListener("keyup", function(e) {
+      keys[e.key] = false;
+    });
+
+    // Helper: Returns a random integer between min and max (inclusive).
+    function randomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    // Helper: Returns a random element from an array.
+    function randomChoice(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    // Helper: Create a red obstacle (object) that is at least minDistance from the green ball.
+    function createRedObstacle() {
+      let red;
+      while (true) {
+        red = {
+          x: randomInt(objectMargin, screenWidth - objectMargin - redSize),
+          y: randomInt(gameArea.y + objectMargin, gameArea.y + gameArea.height - objectMargin - redSize),
+          width: redSize,
+          height: redSize,
+          vx: randomChoice([-2, -1, 1, 2]),
+          vy: randomChoice([-2, -1, 1, 2])
+        };
+        let dx = (red.x + red.width / 2) - (player.x + player.width / 2);
+        let dy = (red.y + red.height / 2) - (player.y + player.height / 2);
+        let distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance >= minDistance) break;
+      }
+      return red;
+    }
+
+    // Collision detection.
+    function collides(a, b) {
+      return a.x < b.x + b.width &&
+             a.x + a.width > b.x &&
+             a.y < b.y + b.height &&
+             a.y + a.height > b.y;
+    }
+
+    // Global timing variables.
+    let lastTime = performance.now();
+    let animationFrameId;
+    let pauseUntil = 0;
+
+    // Instructions.
+    const instructions = [
+      "W: Move Up (vertical)",
+      "S: Move Down (vertical)",
+      "A: Move Left (horizontal)",
+      "D: Move Right (horizontal)",
+      "X: Stop Movement",
+      "B: Make Bigger (hold)",
+      "T: Make Smaller (hold)",
+      "Bounce (edges): Increases size & speed",
+      "Hit blue: +1 point, then relocate targets and pause 0.5 sec",
+      "Red: Lose if touched",
+      "Restart when speed >= 5x initial",
+      "Q: Quit"
+    ];
+
+    // Main game loop.
+    function gameLoop() {
+      let now = performance.now();
+      let deltaTime = now - lastTime;
+      lastTime = now;
+
+      if (now < pauseUntil) {
+        draw();
+        animationFrameId = requestAnimationFrame(gameLoop);
+        return;
+      }
+      update(deltaTime);
+      draw();
+      animationFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    // Update game state.
+    function update(deltaTime) {
+      // Update player velocity based on key input.
+      if (keys["w"] || keys["W"] || keys["ArrowUp"]) {
+        player.vx = 0;
+        player.vy = -initialPlayerSpeed;
+      } else if (keys["s"] || keys["S"] || keys["ArrowDown"]) {
+        player.vx = 0;
+        player.vy = initialPlayerSpeed;
+      } else if (keys["a"] || keys["A"] || keys["ArrowLeft"]) {
+        player.vy = 0;
+        player.vx = -initialPlayerSpeed;
+      } else if (keys["d"] || keys["D"] || keys["ArrowRight"]) {
+        player.vy = 0;
+        player.vx = initialPlayerSpeed;
+      } else if (keys["x"] || keys["X"]) {
+        player.vx = 0;
+        player.vy = 0;
+      }
+
+      // Update player's position.
+      player.x += player.vx;
+      player.y += player.vy;
+
+      // Bounce the player off the game area edges.
+      if (player.x < gameArea.x) {
+        player.x = gameArea.x;
+        player.vx = -player.vx;
+      }
+      if (player.x + player.width > gameArea.x + gameArea.width) {
+        player.x = gameArea.x + gameArea.width - player.width;
+        player.vx = -player.vx;
+      }
+      if (player.y < gameArea.y) {
+        player.y = gameArea.y;
+        player.vy = -player.vy;
+      }
+      if (player.y + player.height > gameArea.y + gameArea.height) {
+        player.y = gameArea.y + gameArea.height - player.height;
+        player.vy = -player.vy;
+      }
+
+      // Check if the player hit an edge exactly.
+      let bounced = false;
+      if (player.x === gameArea.x || player.x + player.width === gameArea.x + gameArea.width) {
+        bounced = true;
+      }
+      if (player.y === gameArea.y || player.y + player.height === gameArea.y + gameArea.height) {
+        bounced = true;
+      }
+      if (bounced) {
+        player.vx *= bounceMultiplier;
+        player.vy *= bounceMultiplier;
+        let cx = player.x + player.width / 2;
+        let cy = player.y + player.height / 2;
+        player.width = Math.floor(player.width * bounceMultiplier);
+        player.height = Math.floor(player.height * bounceMultiplier);
+        player.x = cx - player.width / 2;
+        player.y = cy - player.height / 2;
+      }
+
+      // Update red obstacles: drift and bounce off game area edges.
+      for (let red of redObstacles) {
+        red.x += red.vx;
+        red.y += red.vy;
+        if (red.x < gameArea.x) {
+          red.x = gameArea.x;
+          red.vx = -red.vx;
+        }
+        if (red.x + red.width > gameArea.x + gameArea.width) {
+          red.x = gameArea.x + gameArea.width - red.width;
+          red.vx = -red.vx;
+        }
+        if (red.y < gameArea.y) {
+          red.y = gameArea.y;
+          red.vy = -red.vy;
+        }
+        if (red.y + red.height > gameArea.y + gameArea.height) {
+          red.y = gameArea.y + gameArea.height - red.height;
+          red.vy = -red.vy;
+        }
+      }
+
+      // Check collision with red obstacles.
+      for (let red of redObstacles) {
+        if (collides(player, red)) {
+          gameOver();
+          return;
+        }
+      }
+
+      // Check collision with the blue target.
+      if (collides(player, target)) {
+        currentScore++;
+        // Reposition the blue target.
+        target.x = randomInt(objectMargin, screenWidth - objectMargin - target.width);
+        target.y = randomInt(gameArea.y + objectMargin, gameArea.y + gameArea.height - objectMargin - target.height);
+        // Reposition all red obstacles with new velocities.
+        for (let i = 0; i < redObstacles.length; i++) {
+          let newRed = createRedObstacle();
+          redObstacles[i].x = newRed.x;
+          redObstacles[i].y = newRed.y;
+          redObstacles[i].vx = randomChoice([-2, -1, 1, 2]);
+          redObstacles[i].vy = randomChoice([-2, -1, 1, 2]);
+        }
+        // After each multiple of 3 points, add a new red obstacle.
+        let desiredCount = 2 + Math.floor(currentScore / 3);
+        if (redObstacles.length < desiredCount) {
+          let newRed = createRedObstacle();
+          newRed.vx = randomChoice([-2, -1, 1, 2]);
+          newRed.vy = randomChoice([-2, -1, 1, 2]);
+          redObstacles.push(newRed);
+        }
+        // Immediately update display so new positions are shown.
+        draw();
+        // Pause for 500 ms (half a second) after repositioning.
+        pause(500);
+      }
+
+      // End round if player's speed reaches 5× the initial speed.
+      let speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
+      if (speed >= initialPlayerSpeed * maxSpeedMultiplier) {
+        gameOver();
+        return;
+      }
+
+      // Continuous scaling with B and T keys.
+      if (keys["b"] || keys["B"]) {
+        let cx = player.x + player.width / 2;
+        let cy = player.y + player.height / 2;
+        player.width += 2;
+        player.height += 2;
+        player.x = cx - player.width / 2;
+        player.y = cy - player.height / 2;
+      }
+      if (keys["t"] || keys["T"]) {
+        if (player.width > 10 && player.height > 10) {
+          let cx = player.x + player.width / 2;
+          let cy = player.y + player.height / 2;
+          player.width -= 2;
+          player.height -= 2;
+          player.x = cx - player.width / 2;
+          player.y = cy - player.height / 2;
+        }
+      }
+    }
+
+    // Draw everything.
+    function draw() {
+      ctx.clearRect(0, 0, screenWidth, screenHeight);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, screenWidth, screenHeight);
+      ctx.strokeStyle = "rgb(200,200,200)";
+      ctx.strokeRect(gameArea.x, gameArea.y, gameArea.width, gameArea.height);
+      ctx.fillStyle = "blue";
+      ctx.fillRect(target.x, target.y, target.width, target.height);
+      ctx.fillStyle = "red";
+      for (let red of redObstacles) {
+        ctx.fillRect(red.x, red.y, red.width, red.height);
+      }
+      ctx.fillStyle = "green";
+      ctx.beginPath();
+      ctx.ellipse(player.x + player.width / 2, player.y + player.height / 2, player.width / 2, player.height / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "black";
+      ctx.font = "20px Arial";
+      let scoreText = `Current Score: ${currentScore}    Previous Game Score: ${previousScore}    High Score: ${highScore}`;
+      ctx.fillText(scoreText, 10, 30);
+      ctx.font = "16px Arial";
+      let y = screenHeight - bottomMargin + 20;
+      for (let instr of instructions) {
+        ctx.fillText(instr, 10, y);
+        y += 24;
+      }
+    }
+
+    // Simple busy-wait pause.
+    function pause(ms) {
+      const start = performance.now();
+      while (performance.now() - start < ms) { }
+    }
+
+    // Game over: update scores and reset.
+    function gameOver() {
+      previousScore = currentScore;
+      if (currentScore > highScore) highScore = currentScore;
+      resetGame();
+    }
+
+    // Reset game for a new round.
+    function resetGame() {
+      currentScore = 0;
+      player.x = randomInt(gameArea.x + objectMargin, gameArea.x + gameArea.width - objectMargin - playerInitialWidth);
+      player.y = randomInt(gameArea.y + objectMargin, gameArea.y + gameArea.height - objectMargin - playerInitialHeight);
+      player.width = playerInitialWidth;
+      player.height = playerInitialHeight;
+      player.vx = 0;
+      player.vy = 0;
+      target.x = randomInt(objectMargin, screenWidth - objectMargin - targetSize);
+      target.y = randomInt(gameArea.y + objectMargin, gameArea.y + gameArea.height - objectMargin - targetSize);
+      redObstacles = [];
+      for (let i = 0; i < 2; i++) {
+        let red = createRedObstacle();
+        red.vx = randomChoice([-2, -1, 1, 2]);
+        red.vy = randomChoice([-2, -1, 1, 2]);
+        redObstacles.push(red);
+      }
+    }
+
+    // Start the game loop.
+    function gameLoop() {
+      let now = performance.now();
+      let deltaTime = now - lastTime;
+      lastTime = now;
+      if (now < pauseUntil) {
+        draw();
+        animationFrameId = requestAnimationFrame(gameLoop);
+        return;
+      }
+      update(deltaTime);
+      draw();
+      animationFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+  </script>
+</body>
+</html>
