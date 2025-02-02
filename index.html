@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Green Ball Game</title>
+  <title>Green Ball Game with D-Pad</title>
   <style>
     body { margin: 0; background: #eee; }
     canvas { display: block; margin: 0 auto; background: #fff; touch-action: none; }
@@ -19,10 +19,22 @@
     const screenWidth = canvas.width;
     const screenHeight = canvas.height;
 
-    // Define margins.
-    const topMargin = 50;       // Reserved for scores.
-    const bottomMargin = 100;   // Reserved for instructions.
-    const gameArea = { x: 0, y: topMargin, width: screenWidth, height: screenHeight - topMargin - bottomMargin };
+    // Define margins and areas.
+    const topMargin = 50; // Area at top for scores.
+    // We'll use the top half (from y = topMargin to y = screenHeight/2) for gameplay.
+    const gameArea = { 
+      x: 0, 
+      y: topMargin, 
+      width: screenWidth, 
+      height: Math.floor(screenHeight/2) - topMargin 
+    };
+    // The bottom half (from y = screenHeight/2 to y = screenHeight) will be our D-Pad area.
+    const dpadArea = { 
+      x: 0, 
+      y: Math.floor(screenHeight/2), 
+      width: screenWidth, 
+      height: screenHeight - Math.floor(screenHeight/2)
+    };
 
     // Constants.
     const objectMargin = 20;   // Margin for objects inside the game area.
@@ -33,9 +45,9 @@
     const playerInitialHeight = 50;
     const initialPlayerSpeed = 4;
     const bounceMultiplier = 1.1;
-    const maxSpeedMultiplier = 5;  // End round if player's speed >= initialPlayerSpeed * 5
+    const maxSpeedMultiplier = 5; // End round if speed >= initialPlayerSpeed * 5
 
-    // Game scores.
+    // Scores.
     let currentScore = 0;
     let previousScore = 0;
     let highScore = 0;
@@ -69,7 +81,6 @@
     const keys = {};
     window.addEventListener("keydown", function(e) {
       keys[e.key] = true;
-      // Quit the game if Q is pressed.
       if (e.key.toLowerCase() === "q") {
         cancelAnimationFrame(animationFrameId);
       }
@@ -78,24 +89,64 @@
       keys[e.key] = false;
     });
 
-    // Mobile touch support: when you tap, the green ball moves toward the tap.
+    // Add mobile touch support for both game area and D-Pad.
     canvas.addEventListener("touchstart", function(e) {
-      e.preventDefault(); // Prevent scrolling.
+      e.preventDefault();
       let touch = e.touches[0];
       let rectCanvas = canvas.getBoundingClientRect();
       let touchX = touch.clientX - rectCanvas.left;
       let touchY = touch.clientY - rectCanvas.top;
-      // Compute direction from player's center to tap.
-      let centerX = player.x + player.width / 2;
-      let centerY = player.y + player.height / 2;
-      let dx = touchX - centerX;
-      let dy = touchY - centerY;
-      let len = Math.sqrt(dx * dx + dy * dy);
-      if (len > 0) {
-        player.vx = (dx / len) * initialPlayerSpeed;
-        player.vy = (dy / len) * initialPlayerSpeed;
+      // If touch is in the D-Pad area, process as D-Pad input.
+      if (touchY >= dpadArea.y) {
+        processDpadTouch(touchX, touchY);
+      } else {
+        // Otherwise, move the ball toward the tap (optional, or you can ignore).
+        let centerX = player.x + player.width / 2;
+        let centerY = player.y + player.height / 2;
+        let dx = touchX - centerX;
+        let dy = touchY - centerY;
+        let len = Math.sqrt(dx*dx + dy*dy);
+        if (len > 0) {
+          player.vx = (dx / len) * initialPlayerSpeed;
+          player.vy = (dy / len) * initialPlayerSpeed;
+        }
       }
     });
+
+    // Process D-Pad touch in the bottom half.
+    // We'll define four button areas within the D-Pad area.
+    const dpadSize = 80; // Size of the D-Pad (square) that we'll draw in the bottom left.
+    const dpadX = 10;
+    const dpadY = dpadArea.y + 10;
+    const upButton = { x: dpadX + dpadSize/3, y: dpadY, width: dpadSize/3, height: dpadSize/3 };
+    const leftButton = { x: dpadX, y: dpadY + dpadSize/3, width: dpadSize/3, height: dpadSize/3 };
+    const rightButton = { x: dpadX + 2*dpadSize/3, y: dpadY + dpadSize/3, width: dpadSize/3, height: dpadSize/3 };
+    const downButton = { x: dpadX + dpadSize/3, y: dpadY + 2*dpadSize/3, width: dpadSize/3, height: dpadSize/3 };
+
+    function processDpadTouch(touchX, touchY) {
+      // Check which button rectangle the touch point falls in.
+      if (touchX >= upButton.x && touchX <= upButton.x + upButton.width &&
+          touchY >= upButton.y && touchY <= upButton.y + upButton.height) {
+        // Up
+        player.vx = 0;
+        player.vy = -initialPlayerSpeed;
+      } else if (touchX >= downButton.x && touchX <= downButton.x + downButton.width &&
+                 touchY >= downButton.y && touchY <= downButton.y + downButton.height) {
+        // Down
+        player.vx = 0;
+        player.vy = initialPlayerSpeed;
+      } else if (touchX >= leftButton.x && touchX <= leftButton.x + leftButton.width &&
+                 touchY >= leftButton.y && touchY <= leftButton.y + leftButton.height) {
+        // Left
+        player.vy = 0;
+        player.vx = -initialPlayerSpeed;
+      } else if (touchX >= rightButton.x && touchX <= rightButton.x + rightButton.width &&
+                 touchY >= rightButton.y && touchY <= rightButton.y + rightButton.height) {
+        // Right
+        player.vy = 0;
+        player.vx = initialPlayerSpeed;
+      }
+    }
 
     // Helper: Returns a random integer between min and max (inclusive).
     function randomInt(min, max) {
@@ -140,25 +191,18 @@
     let animationFrameId;
     let pauseUntil = 0;
 
-    // Expanded instructions (to display at the bottom).
+    // Expanded instructions (we'll now also mention the D-pad).
     const instructions = [
       "How to Play:",
-      "1. Navigate the green ball to touch the blue target.",
+      "1. Touch the green ball's D-Pad buttons in the bottom half to move it.",
       "2. Each blue target gives you 1 point.",
       "3. Avoid the drifting red balls—touching one ends the game.",
       "4. The green ball bounces off the walls, growing and speeding up.",
-      "5. If the green ball's speed reaches 5× its initial speed, the round ends.",
+      "5. If its speed reaches 5× its initial speed, the round ends.",
       "",
       "Controls:",
-      "W / Arrow Up: Move Up",
-      "S / Arrow Down: Move Down",
-      "A / Arrow Left: Move Left",
-      "D / Arrow Right: Move Right",
-      "X: Stop Movement",
-      "B: Increase size",
-      "T: Decrease size",
-      "Tap (mobile): Move toward tap",
-      "Q: Quit"
+      "• Use the D-Pad (bottom left) or tap elsewhere to move toward that point.",
+      "• Q: Quit"
     ];
 
     // Main game loop.
@@ -179,7 +223,7 @@
 
     // Update game state.
     function update(deltaTime) {
-      // Update player velocity based on key input.
+      // Update player velocity based on keyboard input.
       if (keys["w"] || keys["W"] || keys["ArrowUp"]) {
         player.vx = 0;
         player.vy = -initialPlayerSpeed;
@@ -292,7 +336,7 @@
         }
         // Immediately update display so new positions are shown.
         draw();
-        // Set pauseUntil to 500 ms from now, pausing after repositioning.
+        // Pause for 500 ms (half a second) after repositioning.
         pauseUntil = performance.now() + 500;
         return;
       }
@@ -342,19 +386,51 @@
       ctx.beginPath();
       ctx.ellipse(player.x + player.width / 2, player.y + player.height / 2, player.width / 2, player.height / 2, 0, 0, Math.PI * 2);
       ctx.fill();
+      // Draw scores in the top margin.
       ctx.fillStyle = "black";
       ctx.font = "20px Arial";
       let scoreText = `Current Score: ${currentScore}    Previous Game Score: ${previousScore}    High Score: ${highScore}`;
       ctx.fillText(scoreText, 10, 30);
+      
+      // Draw the D-Pad in the bottom half.
+      // D-Pad will be drawn in the bottom left corner of the dpadArea.
+      const dpadSize = 80;
+      const dpadX = 10;
+      const dpadY = dpadArea.y + 10; // dpadArea is the bottom half of the canvas.
+      // Define button regions.
+      const upButton = { x: dpadX + dpadSize/3, y: dpadY, width: dpadSize/3, height: dpadSize/3 };
+      const leftButton = { x: dpadX, y: dpadY + dpadSize/3, width: dpadSize/3, height: dpadSize/3 };
+      const rightButton = { x: dpadX + 2*dpadSize/3, y: dpadY + dpadSize/3, width: dpadSize/3, height: dpadSize/3 };
+      const downButton = { x: dpadX + dpadSize/3, y: dpadY + 2*dpadSize/3, width: dpadSize/3, height: dpadSize/3 };
+      
+      // Draw D-Pad background.
+      ctx.strokeStyle = "black";
+      ctx.strokeRect(dpadX, dpadY, dpadSize, dpadSize);
+      // Draw buttons.
+      ctx.fillStyle = "gray";
+      ctx.fillRect(upButton.x, upButton.y, upButton.width, upButton.height);
+      ctx.fillRect(leftButton.x, leftButton.y, leftButton.width, leftButton.height);
+      ctx.fillRect(rightButton.x, rightButton.y, rightButton.width, rightButton.height);
+      ctx.fillRect(downButton.x, downButton.y, downButton.width, downButton.height);
+      
+      // Optionally, draw arrow labels.
+      ctx.fillStyle = "white";
       ctx.font = "16px Arial";
-      let y = screenHeight - bottomMargin + 20;
+      ctx.fillText("↑", upButton.x + upButton.width/2 - 5, upButton.y + upButton.height/2 + 5);
+      ctx.fillText("←", leftButton.x + leftButton.width/2 - 5, leftButton.y + leftButton.height/2 + 5);
+      ctx.fillText("→", rightButton.x + rightButton.width/2 - 5, rightButton.y + rightButton.height/2 + 5);
+      ctx.fillText("↓", downButton.x + downButton.width/2 - 5, downButton.y + downButton.height/2 + 5);
+      
+      // Also draw the instructions (if any) above the D-Pad.
+      ctx.font = "16px Arial";
+      let instrY = dpadArea.y + dpadSize + 20;
       for (let instr of instructions) {
-        ctx.fillText(instr, 10, y);
-        y += 24;
+        ctx.fillText(instr, 10, instrY);
+        instrY += 24;
       }
     }
 
-    // Simple busy-wait pause (not ideal, but used here for simplicity).
+    // Simple busy-wait pause.
     function pause(ms) {
       const start = performance.now();
       while (performance.now() - start < ms) { }
@@ -402,7 +478,43 @@
       animationFrameId = requestAnimationFrame(gameLoop);
     }
 
+    // Touch support for D-Pad area.
+    canvas.addEventListener("touchstart", function(e) {
+      e.preventDefault();
+      let touch = e.touches[0];
+      let rectCanvas = canvas.getBoundingClientRect();
+      let touchX = touch.clientX - rectCanvas.left;
+      let touchY = touch.clientY - rectCanvas.top;
+      // If touch is in the D-Pad area, process D-Pad controls.
+      if (touchY >= dpadArea.y) {
+        // Check which D-Pad button.
+        if (touchX >= (dpadX + dpadSize/3) && touchX <= (dpadX + 2*dpadSize/3) &&
+            touchY >= dpadY && touchY <= dpadY + dpadSize/3) {
+          // Up.
+          player.vx = 0;
+          player.vy = -initialPlayerSpeed;
+        } else if (touchX >= dpadX && touchX <= (dpadX + dpadSize/3) &&
+                   touchY >= dpadY + dpadSize/3 && touchY <= dpadY + 2*dpadSize/3) {
+          // Left.
+          player.vy = 0;
+          player.vx = -initialPlayerSpeed;
+        } else if (touchX >= (dpadX + 2*dpadSize/3) && touchX <= (dpadX + dpadSize) &&
+                   touchY >= dpadY + dpadSize/3 && touchY <= dpadY + 2*dpadSize/3) {
+          // Right.
+          player.vy = 0;
+          player.vx = initialPlayerSpeed;
+        } else if (touchX >= (dpadX + dpadSize/3) && touchX <= (dpadX + 2*dpadSize/3) &&
+                   touchY >= dpadY + 2*dpadSize/3 && touchY <= (dpadY + dpadSize)) {
+          // Down.
+          player.vx = 0;
+          player.vy = initialPlayerSpeed;
+        }
+      }
+    });
+
+    // Start the game loop.
     gameLoop();
+
   </script>
 </body>
 </html>
