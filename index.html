@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Green Ball Game with 3×3 D-Pad</title>
+  <title>Green Ball Game with Full-Width D-Pad</title>
   <style>
     body { margin: 0; background: #eee; }
     canvas { display: block; margin: 0 auto; background: #fff; touch-action: none; }
@@ -21,11 +21,21 @@
 
     // Define margins.
     const topMargin = 50;       // Reserved for scores.
-    const bottomMargin = 480;   // Reserved for D-Pad and instructions.
+    const bottomMargin = 200;   // Reserved for D-Pad and instructions (reduced to make game area taller).
     // The game area occupies from topMargin to (screenHeight - bottomMargin).
-    const gameArea = { x: 0, y: topMargin, width: screenWidth, height: screenHeight - topMargin - bottomMargin };
+    const gameArea = { 
+      x: 0, 
+      y: topMargin, 
+      width: screenWidth, 
+      height: screenHeight - topMargin - bottomMargin 
+    };
     // The D-Pad area is the entire bottom margin.
-    const dpadArea = { x: 0, y: screenHeight - bottomMargin, width: screenWidth, height: bottomMargin };
+    const dpadArea = { 
+      x: 0, 
+      y: screenHeight - bottomMargin, 
+      width: screenWidth, 
+      height: bottomMargin 
+    };
 
     // Constants.
     const objectMargin = 20;   // Margin for objects inside the game area.
@@ -88,7 +98,7 @@
       let rectCanvas = canvas.getBoundingClientRect();
       let touchX = touch.clientX - rectCanvas.left;
       let touchY = touch.clientY - rectCanvas.top;
-      // If touch is in the D-Pad area, process it as D-Pad input.
+      // If touch is in the D-Pad area, process as D-Pad input.
       if (touchY >= dpadArea.y) {
         processDpadTouch(touchX, touchY);
       } else {
@@ -105,22 +115,16 @@
       }
     });
 
-    // Process D-Pad touch input.
+    // Process D-Pad touch input for a 3×3 grid.
     function processDpadTouch(touchX, touchY) {
-      // We'll divide the dpadArea into a 3x3 grid.
-      // Each cell's width and height:
+      // Divide the dpadArea into 3 columns and 3 rows.
       const cellWidth = dpadArea.width / 3;
       const cellHeight = dpadArea.height / 3;
-      // Determine the column (0, 1, or 2) and row (0, 1, or 2) of the touch.
       const col = Math.floor((touchX - dpadArea.x) / cellWidth);
       const row = Math.floor((touchY - dpadArea.y) / cellHeight);
-      // We want only non-diagonal movement.
-      // If the touch is in the left column, move left.
-      // If in the right column, move right.
-      // Otherwise, if in the middle column, then check the row:
-      // - Top row: move up.
-      // - Bottom row: move down.
-      // - Middle row: do nothing (or stop).
+      // For non-diagonal movement, use this mapping:
+      // If in left column, move left; if in right column, move right.
+      // Otherwise (middle column), if in top row, move up; if in bottom row, move down; if center, stop.
       if (col === 0) {
         player.vx = -initialPlayerSpeed;
         player.vy = 0;
@@ -390,17 +394,16 @@
       let scoreText = `Current Score: ${currentScore}    Previous Game Score: ${previousScore}    High Score: ${highScore}`;
       ctx.fillText(scoreText, 10, 30);
       
-      // Draw the D-Pad in the bottom area.
-      // The D-Pad spans the entire dpadArea, which is a 3×3 grid.
+      // Draw the D-Pad in the bottom area (3×3 grid).
       ctx.strokeStyle = "black";
       ctx.strokeRect(dpadArea.x, dpadArea.y, dpadArea.width, dpadArea.height);
       ctx.beginPath();
-      // Draw vertical grid lines.
+      // Vertical grid lines.
       ctx.moveTo(dpadArea.x + dpadArea.width / 3, dpadArea.y);
       ctx.lineTo(dpadArea.x + dpadArea.width / 3, dpadArea.y + dpadArea.height);
       ctx.moveTo(dpadArea.x + 2 * dpadArea.width / 3, dpadArea.y);
       ctx.lineTo(dpadArea.x + 2 * dpadArea.width / 3, dpadArea.y + dpadArea.height);
-      // Draw horizontal grid lines.
+      // Horizontal grid lines.
       ctx.moveTo(dpadArea.x, dpadArea.y + dpadArea.height / 3);
       ctx.lineTo(dpadArea.x + dpadArea.width, dpadArea.y + dpadArea.height / 3);
       ctx.moveTo(dpadArea.x, dpadArea.y + 2 * dpadArea.height / 3);
@@ -410,14 +413,10 @@
       // Optionally, draw labels in the D-Pad grid.
       ctx.font = "20px Arial";
       ctx.fillStyle = "blue";
-      // Left cell in middle row => "←"
-      ctx.fillText("←", dpadArea.x + dpadArea.width/6 - 10, dpadArea.y + dpadArea.height/2 + 7);
-      // Right cell in middle row => "→"
-      ctx.fillText("→", dpadArea.x + 5*dpadArea.width/6 - 10, dpadArea.y + dpadArea.height/2 + 7);
-      // Top cell in middle column => "↑"
-      ctx.fillText("↑", dpadArea.x + dpadArea.width/2 - 10, dpadArea.y + dpadArea.height/6 + 7);
-      // Bottom cell in middle column => "↓"
-      ctx.fillText("↓", dpadArea.x + dpadArea.width/2 - 10, dpadArea.y + 5*dpadArea.height/6 + 7);
+      ctx.fillText("←", screenWidth / 6 - 10, dpadArea.y + dpadArea.height / 2 + 7);
+      ctx.fillText("→", screenWidth * 5 / 6 - 10, dpadArea.y + dpadArea.height / 2 + 7);
+      ctx.fillText("↑", screenWidth / 2 - 10, dpadArea.y + dpadArea.height / 6 + 7);
+      ctx.fillText("↓", screenWidth / 2 - 10, dpadArea.y + 5 * dpadArea.height / 6 + 7);
 
       // Draw the expanded instructions below the D-Pad.
       ctx.font = "16px Arial";
@@ -502,15 +501,10 @@
 
     // Process D-Pad touch input for a 3×3 grid.
     function processDpadTouch(touchX, touchY) {
-      // The D-Pad spans the full dpadArea.
-      // Divide dpadArea into 3 columns and 3 rows.
       const cellWidth = dpadArea.width / 3;
       const cellHeight = dpadArea.height / 3;
       const col = Math.floor((touchX - dpadArea.x) / cellWidth);
       const row = Math.floor((touchY - dpadArea.y) / cellHeight);
-      // For non-diagonal movement, use the following mapping:
-      // If in left column, move left; if in right column, move right.
-      // Otherwise (middle column), if in top row, move up; if in bottom row, move down; if center cell, stop.
       if (col === 0) {
         player.vx = -initialPlayerSpeed;
         player.vy = 0;
@@ -524,7 +518,7 @@
         } else if (row === 2) {
           player.vx = 0;
           player.vy = initialPlayerSpeed;
-        } else { // center cell
+        } else {
           player.vx = 0;
           player.vy = 0;
         }
