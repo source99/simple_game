@@ -2,16 +2,17 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Green Ball Game with Full-Screen D-Pad</title>
+  <title>Green Ball Game (Fixed Aspect Ratio)</title>
   <style>
     body { margin: 0; background: #eee; }
+    /* The canvas will fill the full viewport */
     canvas { display: block; width: 100vw; height: 100vh; background: #fff; touch-action: none; }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
   <script>
-    // Set the canvas size to fill the viewport.
+    // Set up the canvas to fill the full viewport.
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
     const screenWidth = window.innerWidth;
@@ -19,50 +20,42 @@
     canvas.width = screenWidth;
     canvas.height = screenHeight;
 
-    // Define our layout:
-    // The game area will occupy the top 2/3 of the screen.
-    const gameArea = { 
-      x: 0, 
-      y: 0, 
-      width: screenWidth, 
-      height: Math.floor(screenHeight * 2/3) 
-    };
-    // The D-Pad area occupies the bottom 1/3.
-    const dpadArea = { 
-      x: 0, 
-      y: gameArea.height, 
-      width: screenWidth, 
-      height: screenHeight - gameArea.height 
+    // Use a fixed aspect ratio (4:3) for the game area.
+    const gameWidth = screenWidth; 
+    const gameHeight = screenWidth * 3 / 4;  // 4:3 aspect ratio
+    // Place the game area at the top of the canvas.
+    const gameArea = {
+      x: 0,
+      y: 0,
+      width: gameWidth,
+      height: gameHeight
     };
 
-    // We'll draw the D-Pad as a square 3x3 grid.
-    // The square will be as large as possible within dpadArea.
-    const gridSize = Math.min(dpadArea.width, dpadArea.height);
-    // Center the grid horizontally in the dpadArea.
-    const dpadGrid = {
-      x: dpadArea.x + (dpadArea.width - gridSize) / 2,
-      y: dpadArea.y,
-      width: gridSize,
-      height: gridSize
+    // The D-Pad area occupies the remainder of the screen.
+    const dpadArea = {
+      x: 0,
+      y: gameHeight,
+      width: screenWidth,
+      height: screenHeight - gameHeight
     };
 
     // Constants.
-    const objectMargin = 20;   // Margin for objects in the game area.
-    const minDistance = 150;   // Red obstacles must be at least this far from the green ball.
+    const objectMargin = 20;     // Margin for objects inside the game area.
+    const minDistance = 150;     // Red obstacles must be at least this far from the green ball.
     const targetSize = 20;
     const redSize = 20;
     const playerInitialWidth = 50;
     const playerInitialHeight = 50;
     const initialPlayerSpeed = 4;
     const bounceMultiplier = 1.1;
-    const maxSpeedMultiplier = 5; // End round if player's speed >= initialPlayerSpeed * 5
+    const maxSpeedMultiplier = 5;  // End round if player's speed >= initialPlayerSpeed * 5
 
     // Game scores.
     let currentScore = 0;
     let previousScore = 0;
     let highScore = 0;
 
-    // Define the player (green ball).
+    // Define the player (green ball), ensuring it starts inside the game area.
     let player = {
       x: randomInt(gameArea.x + objectMargin, gameArea.x + gameArea.width - objectMargin - playerInitialWidth),
       y: randomInt(gameArea.y + objectMargin, gameArea.y + gameArea.height - objectMargin - playerInitialHeight),
@@ -91,7 +84,6 @@
     const keys = {};
     window.addEventListener("keydown", function(e) {
       keys[e.key] = true;
-      // Quit if Q is pressed.
       if (e.key.toLowerCase() === "q") {
         cancelAnimationFrame(animationFrameId);
       }
@@ -101,22 +93,42 @@
     });
 
     // Mobile touch support.
+    // Touches in the game area (above the D-Pad) will cause the ball to redirect toward the finger.
     canvas.addEventListener("touchstart", function(e) {
       e.preventDefault();
-      let touch = e.touches[0];
-      let rectCanvas = canvas.getBoundingClientRect();
-      let touchX = touch.clientX - rectCanvas.left;
-      let touchY = touch.clientY - rectCanvas.top;
-      // If touch is in the D-Pad area, process as D-Pad input.
+      const touch = e.touches[0];
+      const rectCanvas = canvas.getBoundingClientRect();
+      const touchX = touch.clientX - rectCanvas.left;
+      const touchY = touch.clientY - rectCanvas.top;
       if (touchY >= dpadArea.y) {
         processDpadTouch(touchX, touchY);
       } else {
-        // Otherwise, optionally move the ball toward the tap.
         let centerX = player.x + player.width / 2;
         let centerY = player.y + player.height / 2;
-        let dx = touchX - centerX;
-        let dy = touchY - centerY;
-        let len = Math.sqrt(dx * dx + dy * dy);
+        const dx = touchX - centerX;
+        const dy = touchY - centerY;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        if (len > 0) {
+          player.vx = (dx / len) * initialPlayerSpeed;
+          player.vy = (dy / len) * initialPlayerSpeed;
+        }
+      }
+    });
+    // Touch move to continuously redirect the ball.
+    canvas.addEventListener("touchmove", function(e) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rectCanvas = canvas.getBoundingClientRect();
+      const touchX = touch.clientX - rectCanvas.left;
+      const touchY = touch.clientY - rectCanvas.top;
+      if (touchY >= dpadArea.y) {
+        processDpadTouch(touchX, touchY);
+      } else {
+        let centerX = player.x + player.width / 2;
+        let centerY = player.y + player.height / 2;
+        const dx = touchX - centerX;
+        const dy = touchY - centerY;
+        const len = Math.sqrt(dx*dx + dy*dy);
         if (len > 0) {
           player.vx = (dx / len) * initialPlayerSpeed;
           player.vy = (dy / len) * initialPlayerSpeed;
@@ -125,12 +137,13 @@
     });
 
     // Process D-Pad touch input for a 3×3 grid.
+    // The D-Pad now occupies the entire dpadArea.
     function processDpadTouch(touchX, touchY) {
-      const cellWidth = dpadGrid.width / 3;
-      const cellHeight = dpadGrid.height / 3;
-      const col = Math.floor((touchX - dpadGrid.x) / cellWidth);
-      const row = Math.floor((touchY - dpadGrid.y) / cellHeight);
-      // Mapping: 
+      const cellWidth = dpadArea.width / 3;
+      const cellHeight = dpadArea.height / 3;
+      const col = Math.floor((touchX - dpadArea.x) / cellWidth);
+      const row = Math.floor((touchY - dpadArea.y) / cellHeight);
+      // Mapping:
       // Left column: move left.
       // Right column: move right.
       // Middle column: top cell = up, bottom cell = down, center cell = stop.
@@ -140,7 +153,7 @@
       } else if (col === 2) {
         player.vx = initialPlayerSpeed;
         player.vy = 0;
-      } else { // col === 1 (middle column)
+      } else {
         if (row === 0) {
           player.vx = 0;
           player.vy = -initialPlayerSpeed;
@@ -176,9 +189,9 @@
           vx: randomChoice([-2, -1, 1, 2]),
           vy: randomChoice([-2, -1, 1, 2])
         };
-        let dx = (red.x + red.width / 2) - (player.x + player.width / 2);
-        let dy = (red.y + red.height / 2) - (player.y + player.height / 2);
-        let distance = Math.sqrt(dx * dx + dy * dy);
+        const dx = (red.x + red.width / 2) - (player.x + player.width / 2);
+        const dy = (red.y + red.height / 2) - (player.y + player.height / 2);
+        const distance = Math.sqrt(dx * dx + dy * dy);
         if (distance >= minDistance) break;
       }
       return red;
@@ -343,7 +356,6 @@
           newRed.vy = randomChoice([-2, -1, 1, 2]);
           redObstacles.push(newRed);
         }
-        // Immediately update display so new positions are shown.
         draw();
         // Pause for 500 ms (half a second) after repositioning.
         pauseUntil = performance.now() + 500;
@@ -383,49 +395,51 @@
       ctx.clearRect(0, 0, screenWidth, screenHeight);
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, screenWidth, screenHeight);
+      // Draw game area border.
       ctx.strokeStyle = "rgb(200,200,200)";
       ctx.strokeRect(gameArea.x, gameArea.y, gameArea.width, gameArea.height);
+      // Draw blue target.
       ctx.fillStyle = "blue";
       ctx.fillRect(target.x, target.y, target.width, target.height);
+      // Draw red obstacles.
       ctx.fillStyle = "red";
       for (let red of redObstacles) {
         ctx.fillRect(red.x, red.y, red.width, red.height);
       }
+      // Draw player (green ball).
       ctx.fillStyle = "green";
       ctx.beginPath();
       ctx.ellipse(player.x + player.width / 2, player.y + player.height / 2, player.width / 2, player.height / 2, 0, 0, Math.PI * 2);
       ctx.fill();
-      // Draw scores in the top margin.
+      // Draw scores.
       ctx.fillStyle = "black";
       ctx.font = "20px Arial";
       let scoreText = `Current Score: ${currentScore}    Previous Game Score: ${previousScore}    High Score: ${highScore}`;
       ctx.fillText(scoreText, 10, 30);
       
-      // Draw the D-Pad in the bottom area.
+      // Draw the D-Pad.
       ctx.strokeStyle = "black";
       ctx.strokeRect(dpadArea.x, dpadArea.y, dpadArea.width, dpadArea.height);
       ctx.beginPath();
-      // Draw grid lines for 3 columns and 3 rows in the dpadArea.
+      // Draw vertical grid lines.
       ctx.moveTo(dpadArea.x + dpadArea.width / 3, dpadArea.y);
       ctx.lineTo(dpadArea.x + dpadArea.width / 3, dpadArea.y + dpadArea.height);
       ctx.moveTo(dpadArea.x + 2 * dpadArea.width / 3, dpadArea.y);
       ctx.lineTo(dpadArea.x + 2 * dpadArea.width / 3, dpadArea.y + dpadArea.height);
+      // Draw horizontal grid lines.
       ctx.moveTo(dpadArea.x, dpadArea.y + dpadArea.height / 3);
       ctx.lineTo(dpadArea.x + dpadArea.width, dpadArea.y + dpadArea.height / 3);
       ctx.moveTo(dpadArea.x, dpadArea.y + 2 * dpadArea.height / 3);
       ctx.lineTo(dpadArea.x + dpadArea.width, dpadArea.y + 2 * dpadArea.height / 3);
       ctx.stroke();
-
-      // Optionally, draw labels for the D-Pad.
+      
+      // Optionally, draw D-Pad labels.
       ctx.font = "20px Arial";
       ctx.fillStyle = "blue";
-      // Label left third (←) and right third (→) in the middle row.
       ctx.fillText("←", dpadArea.x + dpadArea.width / 6 - 10, dpadArea.y + dpadArea.height / 2 + 7);
       ctx.fillText("→", dpadArea.x + 5 * dpadArea.width / 6 - 10, dpadArea.y + dpadArea.height / 2 + 7);
-      // Label top and bottom cells of the middle column.
       ctx.fillText("↑", dpadArea.x + dpadArea.width / 2 - 10, dpadArea.y + dpadArea.height / 6 + 7);
       ctx.fillText("↓", dpadArea.x + dpadArea.width / 2 - 10, dpadArea.y + 5 * dpadArea.height / 6 + 7);
-      // Label center cell as stop.
       ctx.fillText("■", dpadArea.x + dpadArea.width / 2 - 10, dpadArea.y + dpadArea.height / 2 + 7);
 
       // Draw expanded instructions below the D-Pad.
@@ -443,14 +457,14 @@
       while (performance.now() - start < ms) { }
     }
 
-    // Game over: update scores and reset the game.
+    // Game over: update scores and reset.
     function gameOver() {
       previousScore = currentScore;
       if (currentScore > highScore) highScore = currentScore;
       resetGame();
     }
 
-    // Reset game variables for a new round.
+    // Reset game for a new round.
     function resetGame() {
       currentScore = 0;
       player.x = randomInt(gameArea.x + objectMargin, gameArea.x + gameArea.width - objectMargin - playerInitialWidth);
@@ -507,31 +521,26 @@
       }
     });
 
-    // Process D-Pad touch input for a 3×3 grid.
-    function processDpadTouch(touchX, touchY) {
-      const cellWidth = dpadArea.width / 3;
-      const cellHeight = dpadArea.height / 3;
-      const col = Math.floor((touchX - dpadArea.x) / cellWidth);
-      const row = Math.floor((touchY - dpadArea.y) / cellHeight);
-      if (col === 0) {
-        player.vx = -initialPlayerSpeed;
-        player.vy = 0;
-      } else if (col === 2) {
-        player.vx = initialPlayerSpeed;
-        player.vy = 0;
-      } else { // Middle column.
-        if (row === 0) {
-          player.vx = 0;
-          player.vy = -initialPlayerSpeed;
-        } else if (row === 2) {
-          player.vx = 0;
-          player.vy = initialPlayerSpeed;
-        } else {
-          player.vx = 0;
-          player.vy = 0;
+    canvas.addEventListener("touchmove", function(e) {
+      e.preventDefault();
+      let touch = e.touches[0];
+      let rectCanvas = canvas.getBoundingClientRect();
+      let touchX = touch.clientX - rectCanvas.left;
+      let touchY = touch.clientY - rectCanvas.top;
+      if (touchY >= dpadArea.y) {
+        processDpadTouch(touchX, touchY);
+      } else {
+        let centerX = player.x + player.width / 2;
+        let centerY = player.y + player.height / 2;
+        let dx = touchX - centerX;
+        let dy = touchY - centerY;
+        let len = Math.sqrt(dx*dx + dy*dy);
+        if (len > 0) {
+          player.vx = (dx / len) * initialPlayerSpeed;
+          player.vy = (dy / len) * initialPlayerSpeed;
         }
       }
-    }
+    });
 
     // Start the game loop.
     gameLoop();
